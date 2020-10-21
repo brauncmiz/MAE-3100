@@ -1,0 +1,76 @@
+function [E,B,cmd] = pathplanner(a,x,N)
+%PATHPLANNER outputs angles for the arms a1 and a2 along the path
+%determined by x using the spline function
+%   a=Column Vector for arm lengths a1 and a2
+%   x=2xN matrix contianing all the points that we need the effector to
+%   pass through
+%   N=Number of intermediate configurations to interpolate on the path
+%   T=Linspace of T to compare x and y to
+%   tq=Spline input guess Linspace
+%   E=2xN matrix containing the path that the end effector will follow
+%   B=2xN matrix containig the path that point B will follow
+%   cmd=2xN matrix containing the joint angles for theta1 and theta2
+
+
+xx=x(1,:);
+yy=x(2,:);
+Ep=length(x);
+T=linspace(1,Ep,Ep);
+tq=linspace(1,Ep,N);
+xq=spline(T,xx,tq);
+yq=spline(T,yy,tq);
+E=[xq;yq];
+B=zeros(2,Ep);
+cmd=zeros(2,Ep);
+
+
+%   For loop uses my index to move through E
+%   B uses the length of the first arm and the value from cmd to determin
+%   the x,y coorindates for B
+for ii=1:N;
+    if ii==1
+       cmd(:,ii)=ikFS(a,E(:,ii),[1;1]);
+    else
+       cmd(:,ii)=ikFS(a,E(:,ii),cmd(:,ii-1));
+    end
+    B(:,ii)=[a(1)*cos(cmd(1,ii));a(1)*sin(cmd(1,ii))];
+end
+
+
+% trace snapshots of the robot at all intermediate positions
+plot([zeros(1,N); B(1,:); E(1,:)],[zeros(1,N); B(2,:); E(2,:)],'k');
+hold on
+axis equal
+% trace trajectory of the end effector
+plot(E(1,:),E(2,:),'b','linewidth',2);
+% mark user-defined milestones
+pt_size = 1000;
+scatter(x(1,:),x(2,:),pt_size,'.')    
+
+
+end
+
+
+function [cmd] = ikFS(a,X,theta)
+%ikFS solves the system of non linear equations for theta
+%   a=A Column vector for the segment lengths a1 and a2
+%   x=A Column vector for the target position of th end effector
+%   theta=Initial guesses for angles theta1 and theta2
+
+
+x=X(1);
+y=X(2);
+
+f1=@(t) a(1)*cos(t(1))+a(2)*cos(t(1)+t(2))-x;
+f2=@(t) a(1)*sin(t(1))+a(2)*sin(t(1)+t(2))-y;
+f= @(t) [f1(t);f2(t)];
+
+options=optimset('display','off');
+[cmd]=fsolve(f,theta,options);
+
+
+
+
+
+
+end
